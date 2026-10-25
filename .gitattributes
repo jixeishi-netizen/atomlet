@@ -1,0 +1,9 @@
+# 统一换行，避免 Windows 上克隆出 CRLF 导致容器内脚本/Dockerfile 失效
+* text=auto
+
+Dockerfile text eol=lf
+docker-compose*.yml text eol=lf
+*.sh text eol=lf
+*.mjs text eol=lf
+*.md text eol=lf
+*.sql text eol=lf

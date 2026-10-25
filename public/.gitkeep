@@ -1,0 +1,3 @@
+# 静态资源目录（favicon、图片等）。
+# 保留此文件是为了让 Dockerfile 里的 COPY /app/public 有东西可拷，
+# 否则 docker build 会报 "/app/public: not found"。
