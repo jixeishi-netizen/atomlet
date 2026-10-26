@@ -33,7 +33,7 @@ sudo usermod -aG docker $USER && newgrp docker
 docker -v && docker compose version
 ```
 
-**配置镜像加速**（拉 Node/Postgres 镜像会快一个数量级）：
+**配置镜像加速**（拉 Node/Postgres 镜像会快一个数量级。**不配的话 `docker compose up --build` 会直接失败**，报 `dial tcp x.x.x.x:443: connection refused` 或 `registry-1.docker.io` 超时）：
 
 ```bash
 sudo mkdir -p /etc/docker
@@ -249,6 +249,8 @@ docker compose exec -T db pg_dump -U atomlet atomlet | gzip > backup-$(date +%F)
 | 生成返回 `fallbackNote` | 模型 key 无效/限流 | 检查 key 与模型名（DeepSeek 只有 `deepseek-flash`、`deepseek-v4-pro`） |
 | 端口 3000 打不开 | 安全组未放行 | 控制台加规则 `3000/3000` |
 | 时区差 8 小时 | 容器默认 UTC | 展示层已按本地时间格式化；如需容器内 TZ，加 `TZ=Asia/Shanghai` |
+| `docker compose up` 报 `dial tcp 4.78.139.50:443: connection refused` | 未配镜像加速，Docker Hub 被拦 | 在 `/etc/docker/daemon.json` 配 `registry-mirrors` 后 `systemctl restart docker`；或手动 `docker pull <公共镜像站>/library/postgres:16-alpine` 再 `docker tag` 成 `postgres:16-alpine` |
+| `docker pull` 仍然超时 | 镜像站失效 | 依次换：`docker.m.daocloud.io` → `docker.nju.edu.cn` → `hub.rat.dev`；或改用阿里云 ACR 个人版托管镜像 |
 
 ---
 

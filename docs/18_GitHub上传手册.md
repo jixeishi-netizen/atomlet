@@ -1,6 +1,6 @@
 # 18. GitHub 上传手册
 
-> 适用：把本地这个项目推到 GitHub，拿到笔试要求的「代码链接」。
+> 适用：把本地这个项目推到 GitHub，拿到笔试要求的「代码链接」。  
 > 前置状态：本地已完成 `git init` 与首次提交（`e680ca2`，78 个文件，分支 `master`，工作区干净，无远程）。
 
 ---
@@ -25,7 +25,7 @@ git ls-files | grep -E "^\.env$|model\.config\.json" || echo "安全：无敏感
 
 ## 1. 建仓库（GitHub 网页，约 1 分钟）
 
-1. 打开 https://github.com/new
+1. 打开 <https://github.com/new>
 2. **Repository name**：`atomlet`
 3. **Description**（可选）：`多智能体驱动的内部小工具生成器：一句话或一张表格，生成带真实数据库的可用应用`
 4. 可见性：**Public**（笔试建议公开，对方能直接点开看代码；若要 Private，交付后需把面试官账号加成 Collaborator，否则他打不开）
@@ -33,7 +33,7 @@ git ls-files | grep -E "^\.env$|model\.config\.json" || echo "安全：无敏感
 
 > 第 5 条是新手最常踩的坑：勾了 README，远程就有一个你本地没有的提交，push 会被拒绝（见 §5 报错 5）。
 
-6. 点 **Create repository**，页面会显示一串命令——**先别关，等会儿要用里面的地址**。
+1. 点 **Create repository**，页面会显示一串命令——**先别关，等会儿要用里面的地址**。
 
 ---
 
@@ -43,7 +43,7 @@ GitHub 早已不允许用账号密码 push，必须用 **PAT** 或 **SSH**。
 
 ### 方式 A：HTTPS + PAT（推荐，5 分钟）
 
-1. 打开 https://github.com/settings/tokens
+1. 打开 <https://github.com/settings/tokens>
 2. 点 **Generate new token** → **Generate new token (classic)**
 3. Note 填 `atomlet-push`，Expiration 选 30 days
 4. 勾选 **`repo`**（整个大类，会连带勾上下面的子项）
@@ -51,6 +51,7 @@ GitHub 早已不允许用账号密码 push，必须用 **PAT** 或 **SSH**。
 6. **立刻复制** `ghp_xxxxxxxx`——这个页面关掉就再也看不到了
 
 push 时提示输入：
+
 - `Username`：你的 GitHub 用户名（不是邮箱）
 - `Password`：**粘贴刚才那串 token**（不是登录密码）
 
@@ -63,7 +64,7 @@ ssh-keygen -t ed25519 -C "你的邮箱"      # 一路回车，不设密码也行
 cat ~/.ssh/id_ed25519.pub                 # 复制输出的整行
 ```
 
-复制后打开 https://github.com/settings/keys → **New SSH key** → 粘贴 → Add SSH key。
+复制后打开 <https://github.com/settings/keys> → **New SSH key** → 粘贴 → Add SSH key。
 
 验证：
 
@@ -97,11 +98,11 @@ git remote add origin git@github.com:<你的用户名>/atomlet.git
 
 三条命令分别在做什么：
 
-| 命令 | 作用 | 失败会怎样 |
-|---|---|---|
-| `remote add` | 只在本地配置里记一个叫 `origin` 的地址 | 写错地址 → 后面 push 报 404 |
-| `branch -M main` | 把当前分支重命名为 main | 不改也能推，只是分支叫 master，与 GitHub 默认不一致 |
-| `push -u origin main` | 上传并记住"以后 push 默认推这里" | `-u` 省掉后，以后要写全 `git push origin main` |
+| 命令                    | 作用                       | 失败会怎样                                 |
+| --------------------- | ------------------------ | ------------------------------------- |
+| `remote add`          | 只在本地配置里记一个叫 `origin` 的地址 | 写错地址 → 后面 push 报 404                  |
+| `branch -M main`      | 把当前分支重命名为 main           | 不改也能推，只是分支叫 master，与 GitHub 默认不一致     |
+| `push -u origin main` | 上传并记住"以后 push 默认推这里"     | `-u` 省掉后，以后要写全 `git push origin main` |
 
 ---
 
@@ -122,17 +123,17 @@ git remote add origin git@github.com:<你的用户名>/atomlet.git
 
 ## 5. 常见报错对照表
 
-| 报错 | 原因 | 处理 |
-|---|---|---|
-| `remote origin already exists` | 之前配过 | `git remote remove origin` 后重试 |
-| `Authentication failed` | 用了登录密码 | 改用 token（§2 方式 A） |
-| `Support for password authentication was removed` | 同上 | 同上 |
-| `Permission denied (publickey)` | SSH key 没加到 GitHub | 重新执行 `cat ~/.ssh/id_ed25519.pub` 并粘贴到 Settings → SSH keys |
-| `Repository not found` | 地址写错，或 Private 仓库无权限 | 核对用户名/仓库名；Private 下 token 必须勾 `repo` |
-| `Updates were rejected because the remote contains work...` | 建仓库时勾了 README | `git pull --rebase origin main` 再 `git push -u origin main` |
-| `src refspec main does not match any` | 分支名还是 master | 先 `git branch -M main` |
-| `Failed to connect to github.com port 443` / 超时 | 网络到 GitHub 不通 | 见 §6 |
-| `warning: LF will be replaced by CRLF` | Windows 换行提示 | 已用 `.gitattributes` 处理，可忽略 |
+| 报错                                                          | 原因                   | 处理                                                          |
+| ----------------------------------------------------------- | -------------------- | ----------------------------------------------------------- |
+| `remote origin already exists`                              | 之前配过                 | `git remote remove origin` 后重试                              |
+| `Authentication failed`                                     | 用了登录密码               | 改用 token（§2 方式 A）                                           |
+| `Support for password authentication was removed`           | 同上                   | 同上                                                          |
+| `Permission denied (publickey)`                             | SSH key 没加到 GitHub   | 重新执行 `cat ~/.ssh/id_ed25519.pub` 并粘贴到 Settings → SSH keys   |
+| `Repository not found`                                      | 地址写错，或 Private 仓库无权限 | 核对用户名/仓库名；Private 下 token 必须勾 `repo`                        |
+| `Updates were rejected because the remote contains work...` | 建仓库时勾了 README        | `git pull --rebase origin main` 再 `git push -u origin main` |
+| `src refspec main does not match any`                       | 分支名还是 master         | 先 `git branch -M main`                                      |
+| `Failed to connect to github.com port 443` / 超时             | 网络到 GitHub 不通        | 见 §6                                                        |
+| `warning: LF will be replaced by CRLF`                      | Windows 换行提示         | 已用 `.gitattributes` 处理，可忽略                                  |
 
 ---
 
