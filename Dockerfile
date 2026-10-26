@@ -16,6 +16,8 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0
+# alpine 不带时区库，缺了 tzdata 时 TZ=Asia/Shanghai 对系统 time 不生效（页面时间用 Intl，不受影响）
+RUN apk add --no-cache tzdata
 RUN addgroup -g 1001 nodejs && adduser -u 1001 -G nodejs -s /bin/sh -D nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
