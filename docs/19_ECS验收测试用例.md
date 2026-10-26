@@ -1,13 +1,15 @@
 # 19. ECS 验收测试用例（已部署实例）
 
+> 本轮 4 个修复（对话持久化 / 主题生效 / 金额下限 / 时间时区）的回归用例见 `20_修复回归用例.md`。
+
 | 项 | 内容 |
 |---|---|
 | 被测对象 | Atomlet `0.1.0`（Next.js 14.2.35，standalone 镜像） |
-| 被测环境 | 阿里云 ECS，Docker Compose，`/opt/atomlet` |
+| 被测环境 | 阿里云 ECS，Docker Compose，`~/atomlet` |
 | 访问地址 | 公网 `http://118.178.174.105:3000`，本机 `http://127.0.0.1:3000` |
 | 容器 | `atomlet-db`（postgres:16-alpine）、`atomlet-web`（atomlet-web 镜像，`0.0.0.0:3000->3000/tcp`） |
 | 模型通道 | DeepSeek `deepseek-flash`（真实通道），失败自动降级 `mock` |
-| 执行身份 | root，登录 ECS 后 `cd /opt/atomlet` |
+| 执行身份 | root，登录 ECS 后 `cd ~/atomlet` |
 | 用例编号 | `E-01` ~ `E-18`（延续 `docs/11` 的编号风格，`E` = Environment/ECS） |
 | 编写依据 | `docs/17`（部署）、`docs/16`（本地实测）、`docs/08` §5（接口契约）、`docs/15` §9（P-01~P-09）、`src/app/api/**`、`src/lib/**` 源码 |
 | 与本地测试的分工 | `docs/16` 已覆盖生成质量基准、patch 引擎自检、主流程冒烟。本文档**只补 ECS 特有维度**：外网可达、容器与数据卷、重启持久化、密钥外泄、备份恢复、并发、降级通道 |
@@ -61,7 +63,7 @@
 ## 3. 执行前的公共准备（每开一个新终端都要跑）
 
 ```bash
-cd /opt/atomlet
+cd ~/atomlet
 LOCAL=http://127.0.0.1:3000
 EXT=http://118.178.174.105:3000
 
@@ -97,7 +99,7 @@ echo "APP_ID=$APP_ID"
 **覆盖维度**：外网可达、安全组、端口监听、超时 / refused / 502 三态区分。
 
 **前置条件**
-- 已在 ECS 上，`cd /opt/atomlet`。
+- 已在 ECS 上，`cd ~/atomlet`。
 - `docker compose ps` 显示 `atomlet-web` 为 healthy。
 - 手上另有一台不在同一内网的设备（手机 4G 或另一台电脑）用于反向确认。
 
@@ -213,12 +215,12 @@ curl -s -w "\nHTTP %{http_code}\n" $LOCAL/api/healthz
 
 - 2a：`{"ok":true,"db":"up","ts":"2026-..."}`，`HTTP 200`。
 - 2b：输出 `1`。
-- 2c：两行都是 `healthy`；表清单为 5 行：`app_records`、`app_versions`、`apps`、`gen_runs`、`share_links`。
+- 2c：两行都是 `healthy`；表清单为 6 行：`app_records`、`app_versions`、`apps`、`gen_runs`、`messages`、`share_links`（只出 5 行说明 `drizzle/0001_messages.sql` 还没执行，先按 `20_修复回归用例.md` R-01 的前置步骤补跑）。
 - 2d：停库后返回 `{"ok":false,"db":"down","error":"..."}` 与 `HTTP 503`；起库后健康检查恢复 `{"ok":true,"db":"up"}` 与 `HTTP 200`。
 
 **判定标准**
 
-`/api/healthz` 返回 `ok:true`、`db:up`、HTTP 200，且 `psql select 1` 成功、5 张表齐备，即为通过。2d 是 503 语义的加分证据，不作为主判定。
+`/api/healthz` 返回 `ok:true`、`db:up`、HTTP 200，且 `psql select 1` 成功、6 张表齐备，即为通过。2d 是 503 语义的加分证据，不作为主判定。
 
 **失败排查**
 
@@ -852,10 +854,10 @@ curl -s -o /dev/null -w "app_page=%{http_code}\n" $LOCAL/apps/$APP_ID
 
 ```bash
 # 13a 备份 .env，把 key 改成一个必然失败的假 key
-cp -a /opt/atomlet/.env /opt/atomlet/.env.bak
-chmod 600 /opt/atomlet/.env.bak
-sed -i 's|^LLM_API_KEY=.*|LLM_API_KEY=sk-invalid-000000000000000000000000000000000000|' /opt/atomlet/.env
-grep -c '^LLM_API_KEY=sk-invalid-' /opt/atomlet/.env
+cp -a ~/atomlet/.env ~/atomlet/.env.bak
+chmod 600 ~/atomlet/.env.bak
+sed -i 's|^LLM_API_KEY=.*|LLM_API_KEY=sk-invalid-000000000000000000000000000000000000|' ~/atomlet/.env
+grep -c '^LLM_API_KEY=sk-invalid-' ~/atomlet/.env
 
 # 13b 必须重建容器（restart 不会重读 env_file）
 docker compose up -d --force-recreate web
@@ -873,8 +875,8 @@ echo "error 事件命中: $(grep -c '\"t\":\"error\"' /tmp/gen_bad.log)"
 PSQL "select status, model, coalesce(left(error,80),'-') from gen_runs order by started_at desc limit 1"
 
 # 13e 恢复 .env 并重建
-cp -a /opt/atomlet/.env.bak /opt/atomlet/.env
-chmod 600 /opt/atomlet/.env
+cp -a ~/atomlet/.env.bak ~/atomlet/.env
+chmod 600 ~/atomlet/.env
 docker compose up -d --force-recreate web
 for i in $(seq 1 40); do curl -sf -o /dev/null $LOCAL/api/healthz && break; sleep 2; done
 
@@ -885,7 +887,7 @@ curl -sN -X POST $LOCAL/api/apps/generate \
   | tee /tmp/gen_ok.log | tail -2
 echo "fallbackNote 命中: $(grep -c 'fallbackNote' /tmp/gen_ok.log)"
 PSQL "select status, model from gen_runs order by started_at desc limit 1"
-rm -f /opt/atomlet/.env.bak
+rm -f ~/atomlet/.env.bak
 ```
 
 **期望结果**
@@ -907,7 +909,7 @@ rm -f /opt/atomlet/.env.bak
 |---|---|---|
 | 13c 出现 `{"t":"error"}` 且 HTTP 仍 200 | 降级链没生效（`getProvider()` 未包 `withFallback`） | `grep -n 'withFallback' src/lib/agent/provider.ts`；`git diff` 确认后 `docker compose up -d --build` |
 | 13f 的 `gen_runs.model` 还是 `mock(降级)` | 恢复 .env 后没重建容器，进程还拿着旧 env | `docker compose up -d --force-recreate web`；`docker compose exec -T web sh -c 'echo $LLM_API_KEY \| cut -c1-6'` 确认前 6 位是 `sk-` 开头且不是 `sk-inv` |
-| 13a 的 `sed` 把 `.env` 改坏（JSON 或多行） | `.env` 里有注释或多余空格导致替换异常 | `cp -a /opt/atomlet/.env.bak /opt/atomlet/.env` 还原，改用 `vi .env` 手工改 `LLM_API_KEY` 一行 |
+| 13a 的 `sed` 把 `.env` 改坏（JSON 或多行） | `.env` 里有注释或多余空格导致替换异常 | `cp -a ~/atomlet/.env.bak ~/atomlet/.env` 还原，改用 `vi .env` 手工改 `LLM_API_KEY` 一行 |
 
 ---
 
@@ -922,7 +924,7 @@ rm -f /opt/atomlet/.env.bak
 
 ```bash
 # 14a 取出真实 key（只用于比对，不回显全文）
-KEY=$(grep -E '^LLM_API_KEY=' /opt/atomlet/.env | cut -d= -f2- | tr -d '\r')
+KEY=$(grep -E '^LLM_API_KEY=' ~/atomlet/.env | cut -d= -f2- | tr -d '\r')
 echo "key 长度=${#KEY} 前缀=${KEY:0:3}"
 
 # 14b 首页与新应用页的 HTML 里不能出现 key
@@ -981,8 +983,8 @@ docker compose exec -T web sh -c "grep -rEl 'sk-[A-Za-z0-9]{20,}' /app 2>/dev/nu
 
 ```bash
 # 15a 备份
-mkdir -p /opt/atomlet/backups
-BK=/opt/atomlet/backups/atomlet-$(date +%F-%H%M).sql
+mkdir -p ~/atomlet/backups
+BK=~/atomlet/backups/atomlet-$(date +%F-%H%M).sql
 docker compose exec -T db pg_dump -U atomlet atomlet > "$BK"
 ls -lh "$BK"
 grep -c 'CREATE TABLE' "$BK"
@@ -1011,7 +1013,7 @@ docker compose exec -T db psql -U atomlet -d atomlet -tAc "select count(*) from 
 
 **期望结果**
 
-- 15a：`ls -lh` 显示文件大小大于 `100K`；`CREATE TABLE` 命中 5；`COPY public.app_records` 命中 1。
+- 15a：`ls -lh` 显示文件大小大于 `100K`；`CREATE TABLE` 命中 6（只命中 5 说明 `drizzle/0001_messages.sql` 未执行）；`COPY public.app_records` 命中 1。
 - 15b：三个值记下来，供 15d 比对。
 - 15c：`restore exit=0`，无 `ERROR` 输出。
 - 15d：`apps=$A0`、`records=$R0`、md5 与 15b 的 `H0` 相同。
@@ -1019,7 +1021,7 @@ docker compose exec -T db psql -U atomlet -d atomlet -tAc "select count(*) from 
 
 **判定标准**
 
-备份文件含 5 张表的建表语句与 1 段 `COPY public.app_records`，恢复库的 `apps`/`app_records` 行数与 md5 与生产库一致，且恢复库最终被清理，即为通过。只跑通 `pg_dump` 不验证恢复，不算通过。
+备份文件含 6 张表的建表语句与 1 段 `COPY public.app_records`，恢复库的 `apps`/`app_records` 行数与 md5 与生产库一致，且恢复库最终被清理，即为通过。只跑通 `pg_dump` 不验证恢复，不算通过。
 
 **失败排查**
 
