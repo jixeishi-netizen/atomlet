@@ -6,6 +6,7 @@ services:
       POSTGRES_USER: atomlet
       POSTGRES_PASSWORD: atomlet_dev_pw
       POSTGRES_DB: atomlet
+      TZ: Asia/Shanghai
     ports: ['55432:5432']
     volumes: ['pgdata:/var/lib/postgresql/data']
     healthcheck:

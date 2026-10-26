@@ -6,6 +6,7 @@ services:
       POSTGRES_USER: atomlet
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-atomlet_dev_pw}
       POSTGRES_DB: atomlet
+      TZ: Asia/Shanghai
     volumes: ['pgdata:/var/lib/postgresql/data']
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U atomlet -d atomlet']
@@ -19,6 +20,7 @@ services:
     container_name: atomlet-web
     environment:
       DATABASE_URL: postgres://atomlet:${POSTGRES_PASSWORD:-atomlet_dev_pw}@db:5432/atomlet
+      TZ: Asia/Shanghai
     env_file: .env
     ports: ['3000:3000']
     depends_on:

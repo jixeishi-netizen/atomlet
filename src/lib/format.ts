@@ -20,9 +20,38 @@ export function formatValue(field: Field, value: unknown): string {
   return String(value);
 }
 
+/**
+ * 时间统一按北京时间显示。
+ * 不用 getHours() 这类进程本地时区方法：容器默认 UTC，页面会比北京时间慢 8 小时。
+ */
+const DISPLAY_TZ = 'Asia/Shanghai';
+
+function tzParts(d: Date): Record<string, string> {
+  const formatter = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: DISPLAY_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const out: Record<string, string> = {};
+  for (const part of formatter.formatToParts(d)) out[part.type] = part.value;
+  if (out.hour === '24') out.hour = '00';
+  return out;
+}
+
 export function formatDateTime(value: string | Date): string {
   const d = typeof value === 'string' ? new Date(value) : value;
   if (Number.isNaN(d.getTime())) return '—';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const p = tzParts(d);
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`;
+}
+
+export function formatTime(value: string | Date): string {
+  const d = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return '';
+  const p = tzParts(d);
+  return `${p.hour}:${p.minute}`;
 }
