@@ -269,6 +269,41 @@ git pull && docker compose up -d --build
 docker compose exec -T db pg_dump -U atomlet atomlet | gzip > backup-$(date +%F).sql.gz
 ```
 
+### 8.1 发布后修补老应用的数值下限约束（一次性，必做一次）
+
+生成链路和改需求链路都会把「金额必须大于 0」这类自然语言约束落成字段的 `min`（见 `docs/16` 缺陷 13）。
+但**上线这个修复之前就已存在的应用**，其 spec 里的金额字段本来就没有 `min`，服务端按 spec 校验 → 分享页仍能写进 0 元。
+这是数据缺口，代码层面无法自动补，必须对老应用跑一次一次性脚本：
+
+```bash
+# 在源码目录（有 package.json 的地方）执行，逐条打印应用名 / 补了哪些字段 / 新版本号
+npx tsx scripts/repair-constraints.ts
+```
+
+脚本语义（幂等，可重复执行）：
+
+- 遍历 `apps` 全部应用，用 `apps.prompt`（原始需求原文）+ 当前版本 spec 调 `applyConstraintHints`
+- 有变化才 `bumpVersion` 生成**新版本**（note=`按原始需求补充数值下限约束`），历史版本一条都不改，可回滚
+- 第二次运行应输出「扫描 N 个，修补 0 个」
+
+两种执行方式：
+
+```bash
+# 方式一：服务器本机有 Node 20 + 源码目录有 devDependencies（推荐，最省事）
+cd ~/atomlet && npm ci && npx tsx scripts/repair-constraints.ts
+
+# 方式二：不想在宿主机装依赖，用一次性容器跑（挂在同一网络，连 compose 里的 db）
+docker run --rm --network atomlet_default \
+  -e DATABASE_URL=postgres://atomlet:<POSTGRES_PASSWORD>@db:5432/atomlet \
+  -v "$PWD":/app -w /app node:20-alpine \
+  sh -c "npm ci && npx tsx scripts/repair-constraints.ts"
+```
+
+> 生产镜像里**没有** `tsx`（runner 阶段只留 standalone 产物），所以不要尝试 `docker compose exec web npx tsx …`。
+> 网络名用 `docker network ls` 确认，默认为 `<项目目录名>_default`。
+
+修补后用分享链接复验：金额填 `0` 应返回 **422**，金额 `20` 应返回 **201**。
+
 ---
 
 ## 9. 故障速查

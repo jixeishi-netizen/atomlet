@@ -83,6 +83,11 @@ export function FieldInput({ field, value, error, disabled, onChange }: Props) {
           // 只有 number 才带 min/max：让浏览器先挡一层，服务端仍然是最终裁判
           min={field.type === 'number' ? field.min : undefined}
           max={field.type === 'number' ? field.max : undefined}
+          // step="any" 必须显式给：input[type=number] 默认 step=1，配合 min=0.01 会让浏览器
+          // 认为合法值是 0.01 / 1.01 / 2.01…，于是 20 这种正常金额被原生校验判为"步长错误"
+          // （浏览器提示"最接近的两个值是 19.01 和 20.01"，请求根本发不出去）。
+          // min/max 表达业务约束，step 只表达精度：业务值不能被 step 卡住，所以这里用 any。
+          step={field.type === 'number' ? 'any' : undefined}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
         />
