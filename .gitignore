@@ -8,3 +8,5 @@ model.config.json
 .DS_Store
 next-env.d.ts
 .workbuddy/
+*.tsbuildinfo
+.next-*/

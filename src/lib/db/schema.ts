@@ -76,6 +76,39 @@ export const shareLinks = pgTable(
   (t) => ({ uq: uniqueIndex('share_links_token_uq').on(t.token) }),
 );
 
+/** 对话消息的结构化补充；只用 JSONB 承载，避免每次加字段都改表 */
+export type MessageMeta = {
+  kind?: 'generate' | 'patch' | 'rollback' | 'failed';
+  ops?: number;
+  dropped?: number;
+  attempts?: number;
+  model?: string;
+  note?: string | null;
+  degraded?: boolean;
+  fallbackNote?: string | null;
+  instructions?: string[];
+};
+
+/**
+ * 对话线程：应用页刷新后仍能看到「你说了什么 / 原子做了什么」（见 docs/15）。
+ * app_versions.note 只存指令原文，不足以还原一轮交互，所以单独建表。
+ */
+export const messages = pgTable(
+  'messages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    appId: uuid('app_id')
+      .notNull()
+      .references(() => apps.id, { onDelete: 'cascade' }),
+    role: text('role').notNull(),
+    content: text('content').notNull(),
+    version: integer('version'),
+    meta: jsonb('meta').$type<MessageMeta>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({ idx: index('messages_app_created_idx').on(t.appId, t.createdAt) }),
+);
+
 export const genRuns = pgTable('gen_runs', {
   id: uuid('id').primaryKey().defaultRandom(),
   appId: uuid('app_id'),

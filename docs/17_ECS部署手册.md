@@ -1,17 +1,17 @@
 # 17. ECS 部署手册（阿里云）
 
-> 目标：在一台干净的阿里云 ECS 上，30 分钟内把 Atomlet 跑起来，得到一个可点开的公网链接。
+> 目标：在一台干净的阿里云 ECS 上，30 分钟内把 Atomlet 跑起来，得到一个可点开的公网链接。  
 > 前置：一台 ECS、一个可用的模型 key（可选，没有 key 也能跑 mock）。
 
 ---
 
 ## 0. 先做三个决定
 
-| 决定 | 建议 | 理由 |
-|---|---|---|
-| 规格 | **2 核 4G 起**（2G 必须加 swap） | `next build` 在 2G 上大概率 OOM；本项目构建峰值约 1.6G |
-| 系统 | Ubuntu 22.04 或 Alibaba Cloud Linux 3 | Docker 生态资料多，出问题好搜 |
-| 访问方式 | 先用 `IP:3000`，有域名再上 Nginx | 国内备案周期长；Demo 用 IP 完全够，且不影响 SSE |
+| 决定   | 建议                                   | 理由                                       |
+| ---- | ------------------------------------ | ---------------------------------------- |
+| 规格   | **2 核 4G 起**（2G 必须加 swap）            | `next build` 在 2G 上大概率 OOM；本项目构建峰值约 1.6G |
+| 系统   | Ubuntu 22.04 或 Alibaba Cloud Linux 3 | Docker 生态资料多，出问题好搜                       |
+| 访问方式 | 先用 `IP:3000`，有域名再上 Nginx             | 国内备案周期长；Demo 用 IP 完全够，且不影响 SSE           |
 
 **安全组**必须放行：`22`（SSH）、`3000`（应用）。要上域名就再加 `80` / `443`。
 
@@ -154,6 +154,8 @@ docker compose exec -T db psql -U atomlet -d atomlet -c '\dt'
 
 > 这个 SQL 是幂等的（`CREATE TABLE IF NOT EXISTS`），重复执行不会报错。
 
+
+
 ---
 
 ## 6. 冒烟验证
@@ -240,17 +242,17 @@ docker compose exec -T db pg_dump -U atomlet atomlet | gzip > backup-$(date +%F)
 
 ## 9. 故障速查
 
-| 现象 | 原因 | 处理 |
-|---|---|---|
-| web 起不来，日志 `28P01` | `DATABASE_URL` 密码与 `POSTGRES_PASSWORD` 不一致 | 两者必须一致；改完 `docker compose up -d` 重建 |
-| 页面 500，日志 `relation "apps" does not exist` | 漏了第 5 步建表 | 执行 `psql < drizzle/0000_init.sql` |
-| 构建被杀 / `Killed` | 内存不足 | 加 2G swap，或本机构建后传镜像 |
-| 生成时进度条停住、最后一次性出结果 | Nginx 缓冲了 SSE | `proxy_buffering off` |
-| 生成返回 `fallbackNote` | 模型 key 无效/限流 | 检查 key 与模型名（DeepSeek 只有 `deepseek-flash`、`deepseek-v4-pro`） |
-| 端口 3000 打不开 | 安全组未放行 | 控制台加规则 `3000/3000` |
-| 时区差 8 小时 | 容器默认 UTC | 展示层已按本地时间格式化；如需容器内 TZ，加 `TZ=Asia/Shanghai` |
-| `docker compose up` 报 `dial tcp 4.78.139.50:443: connection refused` | 未配镜像加速，Docker Hub 被拦 | 在 `/etc/docker/daemon.json` 配 `registry-mirrors` 后 `systemctl restart docker`；或手动 `docker pull <公共镜像站>/library/postgres:16-alpine` 再 `docker tag` 成 `postgres:16-alpine` |
-| `docker pull` 仍然超时 | 镜像站失效 | 依次换：`docker.m.daocloud.io` → `docker.nju.edu.cn` → `hub.rat.dev`；或改用阿里云 ACR 个人版托管镜像 |
+| 现象                                                                   | 原因                                         | 处理                                                                                                                                                                       |
+| -------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| web 起不来，日志 `28P01`                                                   | `DATABASE_URL` 密码与 `POSTGRES_PASSWORD` 不一致 | 两者必须一致；改完 `docker compose up -d` 重建                                                                                                                                      |
+| 页面 500，日志 `relation "apps" does not exist`                           | 漏了第 5 步建表                                  | 执行 `psql < drizzle/0000_init.sql`                                                                                                                                        |
+| 构建被杀 / `Killed`                                                      | 内存不足                                       | 加 2G swap，或本机构建后传镜像                                                                                                                                                      |
+| 生成时进度条停住、最后一次性出结果                                                    | Nginx 缓冲了 SSE                              | `proxy_buffering off`                                                                                                                                                    |
+| 生成返回 `fallbackNote`                                                  | 模型 key 无效/限流                               | 检查 key 与模型名（DeepSeek 只有 `deepseek-flash`、`deepseek-v4-pro`）                                                                                                              |
+| 端口 3000 打不开                                                          | 安全组未放行                                     | 控制台加规则 `3000/3000`                                                                                                                                                       |
+| 时区差 8 小时                                                             | 容器默认 UTC                                   | 展示层已按本地时间格式化；如需容器内 TZ，加 `TZ=Asia/Shanghai`                                                                                                                               |
+| `docker compose up` 报 `dial tcp 4.78.139.50:443: connection refused` | 未配镜像加速，Docker Hub 被拦                       | 在 `/etc/docker/daemon.json` 配 `registry-mirrors` 后 `systemctl restart docker`；或手动 `docker pull <公共镜像站>/library/postgres:16-alpine` 再 `docker tag` 成 `postgres:16-alpine` |
+| `docker pull` 仍然超时                                                   | 镜像站失效                                      | 依次换：`docker.m.daocloud.io` → `docker.nju.edu.cn` → `hub.rat.dev`；或改用阿里云 ACR 个人版托管镜像                                                                                      |
 
 ---
 

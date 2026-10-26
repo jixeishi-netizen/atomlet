@@ -5,6 +5,22 @@ import { useState } from 'react';
 
 type VersionInfo = { version: number; note: string | null; ops: number };
 
+/** 服务端下发的消息（已在 page.tsx 转成纯数据，createdAt 是 ISO 字符串） */
+export type MessageView = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  version: number | null;
+  createdAt: string;
+  meta?: {
+    kind?: string;
+    ops?: number;
+    dropped?: number;
+    model?: string;
+    degraded?: boolean;
+  } | null;
+};
+
 const SUGGESTIONS = [
   '把巡检得分改成必填',
   '加一个字段：整改负责人',
@@ -12,18 +28,27 @@ const SUGGESTIONS = [
   '加一张平均分卡片',
 ];
 
+function hhmm(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function EditPanel({
   appId,
   currentVersion,
   versions,
+  messages = [],
 }: {
   appId: string;
   currentVersion: number;
   versions: VersionInfo[];
+  messages?: MessageView[];
 }) {
   const router = useRouter();
   const [input, setInput] = useState('');
-  const [logs, setLogs] = useState<string[]>([]);
+  const [liveLogs, setLiveLogs] = useState<string[]>([]);
   const [issues, setIssues] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +59,7 @@ export function EditPanel({
     setPending(true);
     setError(null);
     setIssues([]);
-    setLogs([`指令：${text}`]);
+    setLiveLogs([]);
 
     try {
       const res = await fetch(`/api/apps/${appId}/chat`, {
@@ -68,6 +93,8 @@ export function EditPanel({
       setError((err as Error).message);
     } finally {
       setPending(false);
+      // 历史来自服务端：刷新一次把刚落库的 user/assistant 消息取回来，本地日志随之清空
+      router.refresh();
     }
   }
 
@@ -75,21 +102,22 @@ export function EditPanel({
     const t = evt.t as string;
     if (t === 'patch') {
       const ops = (evt.patch as unknown[]) ?? [];
-      setLogs((prev) => [...prev, `生成 ${ops.length} 条补丁（${String(evt.model)}）`]);
-      if (evt.note) setLogs((prev) => [...prev, String(evt.note)]);
-      if (evt.fallbackNote) setLogs((prev) => [...prev, `⚠ ${String(evt.fallbackNote)}`]);
+      setLiveLogs((prev) => [...prev, `生成 ${ops.length} 条补丁（${String(evt.model)}）`]);
+      if (evt.note) setLiveLogs((prev) => [...prev, String(evt.note)]);
+      if (evt.fallbackNote) setLiveLogs((prev) => [...prev, `⚠ ${String(evt.fallbackNote)}`]);
+    } else if (t === 'text') {
+      setLiveLogs((prev) => [...prev, String(evt.text)]);
     } else if (t === 'warn') {
       setError(`部分补丁被拒绝：${String(evt.reason)}`);
     } else if (t === 'done') {
       if (evt.degraded) {
         setError(String(evt.note ?? '没有识别出可执行的修改'));
       } else {
-        setLogs((prev) => [
+        setLiveLogs((prev) => [
           ...prev,
           `已生成 v${String(evt.versionNo)}：应用 ${String(evt.appliedOps)} 处，丢弃 ${String(evt.droppedOps)} 处`,
         ]);
         setInput('');
-        router.refresh();
       }
     } else if (t === 'error') {
       setError(String(evt.message));
@@ -109,6 +137,46 @@ export function EditPanel({
         </div>
         <VersionMenu appId={appId} currentVersion={currentVersion} versions={versions} />
       </div>
+
+      {messages.length > 0 ? (
+        <div className="mt-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] text-ink-300">
+              对话记录 · 共 {messages.length} 条（刷新页面不会丢）
+            </p>
+          </div>
+          <ul className="mt-1.5 max-h-[280px] space-y-2 overflow-auto rounded-md border border-ink-100 bg-white px-3 py-2">
+            {messages.map((m) => (
+              <li key={m.id} className="text-[12px] leading-relaxed">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={
+                      m.role === 'user'
+                        ? 'rounded bg-ink-50 px-1.5 py-0.5 text-[11px] text-ink-700'
+                        : 'rounded bg-[var(--brand-50)] px-1.5 py-0.5 text-[11px] text-[var(--brand-600)]'
+                    }
+                  >
+                    {m.role === 'user' ? '你' : '原子'}
+                  </span>
+                  {m.version !== null ? (
+                    <span className="chip !px-1.5 !py-0 text-[10px]">v{m.version}</span>
+                  ) : null}
+                  <span className="text-[10px] text-ink-300">{hhmm(m.createdAt)}</span>
+                </div>
+                <p
+                  className={
+                    m.role === 'user'
+                      ? 'mt-1 whitespace-pre-wrap text-ink-900'
+                      : 'mt-1 whitespace-pre-wrap text-ink-700'
+                  }
+                >
+                  {m.content}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="mt-3 flex gap-2">
         <input
@@ -136,7 +204,7 @@ export function EditPanel({
           <button
             key={s}
             type="button"
-            className="chip hover:border-brand-500 hover:text-brand-600"
+            className="chip hover:border-[var(--brand-500)] hover:text-[var(--brand-600)]"
             disabled={pending}
             onClick={() => submit(s)}
           >
@@ -160,9 +228,9 @@ export function EditPanel({
         </div>
       ) : null}
 
-      {logs.length > 0 ? (
+      {liveLogs.length > 0 ? (
         <ul className="mt-3 space-y-1 border-t border-ink-100 pt-2">
-          {logs.map((l, i) => (
+          {liveLogs.map((l, i) => (
             <li key={i} className="text-[11px] text-ink-500">
               · {l}
             </li>
@@ -228,7 +296,7 @@ function VersionMenu({
                 ) : (
                   <button
                     type="button"
-                    className="shrink-0 text-[11px] text-brand-600 hover:underline"
+                    className="shrink-0 text-[11px] text-[var(--brand-600)] hover:underline"
                     disabled={busy !== null}
                     onClick={() => rollback(v.version)}
                   >

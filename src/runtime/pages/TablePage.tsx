@@ -107,7 +107,9 @@ export function TablePage({ entity, page, rows, onRowClick }: Props) {
                   <th key={col.field} className="whitespace-nowrap px-3 py-2 font-medium">
                     <button
                       type="button"
-                      className="inline-flex items-center gap-1 hover:text-ink-900"
+                      className={`inline-flex items-center gap-1 hover:text-ink-900 ${
+                        active ? 'text-[var(--brand-600)]' : ''
+                      }`}
                       onClick={() => toggleSort(col.field)}
                     >
                       {col.label ?? field.label}
@@ -146,7 +148,7 @@ export function TablePage({ entity, page, rows, onRowClick }: Props) {
                   <td className="px-3 py-2 text-right">
                     <button
                       type="button"
-                      className="text-[12px] text-brand-600 hover:underline"
+                      className="text-[12px] text-[var(--brand-600)] hover:underline"
                       onClick={() => onRowClick?.(row)}
                     >
                       详情
@@ -167,7 +169,7 @@ export function TablePage({ entity, page, rows, onRowClick }: Props) {
           <div className="flex gap-2">
             <button
               type="button"
-              className="btn-ghost !py-1"
+              className="btn-ghost !py-1 hover:border-[var(--brand-500)] hover:text-[var(--brand-600)]"
               disabled={current === 0}
               onClick={() => setPageIndex(current - 1)}
             >
@@ -175,7 +177,7 @@ export function TablePage({ entity, page, rows, onRowClick }: Props) {
             </button>
             <button
               type="button"
-              className="btn-ghost !py-1"
+              className="btn-ghost !py-1 hover:border-[var(--brand-500)] hover:text-[var(--brand-600)]"
               disabled={current >= totalPages - 1}
               onClick={() => setPageIndex(current + 1)}
             >

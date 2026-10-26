@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { Entity, Page } from '@/lib/spec/schema';
+import { validateRecordPayload } from '@/lib/validateRecord';
 import { FieldInput, useFormState } from '../FieldInput';
 
 type FormPageSpec = Extract<Page, { type: 'form' }>;
@@ -24,16 +25,25 @@ export function FormPage({ entity, page, submitUrl, onSubmitted }: Props) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (pending) return;
-    setPending(true);
-    setErrors({});
     setMessage(null);
     setGlobalError(null);
+
+    // 提交前先用与服务端同一份实现自校验：不合格就直接标红，不发请求（缺陷 3）
+    const local = validateRecordPayload(entity, form.values);
+    if (!local.ok) {
+      setErrors(local.errors);
+      setGlobalError('有字段未通过校验，请检查标红的项');
+      return;
+    }
+
+    setErrors({});
+    setPending(true);
 
     try {
       const res = await fetch(submitUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entity: entity.key, payload: form.values }),
+        body: JSON.stringify({ entity: entity.key, payload: local.clean }),
       });
       const data = (await res.json()) as {
         error?: string;

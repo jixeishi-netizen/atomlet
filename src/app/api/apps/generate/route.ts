@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import { genRuns, type GenStep } from '@/lib/db/schema';
 import { generateSpec } from '@/lib/agent/pipeline';
 import { getProvider } from '@/lib/agent/provider';
-import { createAppFromSpec } from '@/lib/data';
+import { appendMessage, createAppFromSpec } from '@/lib/data';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -62,6 +62,22 @@ export async function POST(req: Request) {
         });
 
         const { app, shareToken } = await createAppFromSpec({ spec, prompt: effectivePrompt, model });
+
+        // 对话线程：把「原始需求 + 助手摘要」落库，刷新页面后仍可回看（缺陷 1）
+        await appendMessage({
+          appId: app.id,
+          role: 'user',
+          content: effectivePrompt,
+          version: 1,
+          meta: { kind: 'generate', model, instructions: csv.length > 0 ? ['附带一份表格数据'] : [] },
+        });
+        await appendMessage({
+          appId: app.id,
+          role: 'assistant',
+          content: `已生成「${spec.app.name}」：${spec.entities.length} 个实体、${spec.pages.length} 个页面，第 ${attempts} 次通过。`,
+          version: 1,
+          meta: { kind: 'generate', model, attempts, fallbackNote: fallbackNote ?? null },
+        });
 
         await db
           .update(genRuns)

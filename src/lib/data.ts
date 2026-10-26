@@ -1,12 +1,17 @@
 import { randomBytes } from 'node:crypto';
 import { and, desc, eq } from 'drizzle-orm';
 import { db } from './db';
-import { appRecords, appVersions, apps, shareLinks } from './db/schema';
-import type { AppSpec, Entity, Field, RecordPayload } from './spec/schema';
+import { appRecords, appVersions, apps, messages, shareLinks } from './db/schema';
+import type { MessageMeta } from './db/schema';
+import type { AppSpec, Field, RecordPayload } from './spec/schema';
+import { validateRecordPayload, type RecordValidation } from './validateRecord';
 
 export type AppRow = typeof apps.$inferSelect;
 export type RecordRow = typeof appRecords.$inferSelect;
 export type VersionRow = typeof appVersions.$inferSelect;
+export type MessageRow = typeof messages.$inferSelect;
+
+export type { RecordValidation };
 
 export function newToken(len = 12): string {
   return randomBytes(24).toString('base64url').replace(/[-_]/g, '').slice(0, len);
@@ -160,99 +165,46 @@ export async function createAppFromSpec(input: {
   return { app, shareToken: token };
 }
 
-export type RecordValidation = {
-  ok: boolean;
-  errors: Record<string, string>;
-  clean: RecordPayload;
+/** 字段级校验见 ./validateRecord（客户端表单复用同一份实现，这里只做 re-export，不重复实现） */
+export { validateRecordPayload };
+
+export type MessageInput = {
+  appId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  version?: number | null;
+  meta?: MessageMeta | null;
 };
 
-/** 字段级校验：统一表存 JSONB，所以类型约束必须在这一层守住（见 docs/06 ADR-01） */
-export function validateRecordPayload(
-  entity: Entity,
-  payload: RecordPayload,
-): RecordValidation {
-  const errors: Record<string, string> = {};
-  const clean: RecordPayload = {};
-
-  for (const field of entity.fields) {
-    const raw = payload[field.key];
-    const empty = raw === undefined || raw === null || raw === '';
-
-    if (empty) {
-      if (field.required) errors[field.key] = `请填写${field.label}`;
-      continue;
-    }
-
-    switch (field.type) {
-      case 'number': {
-        const num = typeof raw === 'number' ? raw : Number(String(raw).trim());
-        if (Number.isNaN(num)) {
-          errors[field.key] = `${field.label}必须是数字`;
-          break;
-        }
-        if (field.min !== undefined && num < field.min) {
-          errors[field.key] = `${field.label}不能小于 ${field.min}`;
-          break;
-        }
-        if (field.max !== undefined && num > field.max) {
-          errors[field.key] = `${field.label}不能大于 ${field.max}`;
-          break;
-        }
-        clean[field.key] = num;
-        break;
-      }
-      case 'bool': {
-        clean[field.key] = raw === true || raw === 'true' || raw === 'on' || raw === 1;
-        break;
-      }
-      case 'enum': {
-        const value = String(raw);
-        if (!field.enum?.includes(value)) {
-          errors[field.key] = `${field.label}取值必须是：${field.enum?.join(' / ')}`;
-          break;
-        }
-        clean[field.key] = value;
-        break;
-      }
-      case 'date': {
-        const value = String(raw).slice(0, 10);
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-          errors[field.key] = `${field.label}格式应为 YYYY-MM-DD`;
-          break;
-        }
-        clean[field.key] = value;
-        break;
-      }
-      case 'url': {
-        const value = String(raw);
-        if (!/^https?:\/\//i.test(value)) {
-          errors[field.key] = `${field.label}必须以 http(s):// 开头`;
-          break;
-        }
-        clean[field.key] = value;
-        break;
-      }
-      case 'longtext': {
-        const value = String(raw);
-        if (value.length > 2000) {
-          errors[field.key] = `${field.label}不能超过 2000 字`;
-          break;
-        }
-        clean[field.key] = value;
-        break;
-      }
-      default: {
-        const value = String(raw);
-        if (value.length > 200) {
-          errors[field.key] = `${field.label}不能超过 200 字`;
-          break;
-        }
-        clean[field.key] = value;
-      }
-    }
+/**
+ * 写一条对话消息。
+ * 对话不是关键路径：这里吞掉异常并打日志，不能因为记不上历史就让生成/修改失败。
+ */
+export async function appendMessage(input: MessageInput): Promise<void> {
+  const content = input.content.trim();
+  if (!content) return;
+  try {
+    await db.insert(messages).values({
+      appId: input.appId,
+      role: input.role,
+      content: content.slice(0, 2000),
+      version: input.version ?? null,
+      meta: input.meta ?? null,
+    });
+  } catch (err) {
+    console.error('[messages] 写入失败：', (err as Error).message);
   }
+}
 
-  return { ok: Object.keys(errors).length === 0, errors, clean };
+/** 取最近 limit 条，按时间升序返回（页面直接顺着渲染；冷启动只渲染最近 60 条） */
+export async function listMessages(appId: string, limit = 60): Promise<MessageRow[]> {
+  const rows = await db
+    .select()
+    .from(messages)
+    .where(eq(messages.appId, appId))
+    .orderBy(desc(messages.createdAt))
+    .limit(limit);
+  return rows.slice().reverse();
 }
 
 export async function insertRecord(appId: string, entity: string, payload: RecordPayload) {

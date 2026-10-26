@@ -11,6 +11,43 @@ export type GenEvent =
 
 const MAX_ATTEMPTS = 3;
 
+/** 需求里出现这类措辞，说明用户要的是「下限」而不是普通字段描述（缺陷 3） */
+const CONSTRAINT_RE = /大于\s*0|不能为\s*0|必须为正|至少\s*1|不为\s*0/;
+const MONEY_LABEL_RE = /金额|费用|价格|成本|工资/;
+const COUNT_LABEL_RE = /数量|件数|人数|次数/;
+
+/**
+ * 把自然语言约束确定性地落成字段的 min。
+ *
+ * 为什么不能只靠提示词：模型会漏掉「min」这类不出现在页面上、看起来不重要的属性，
+ * 而漏掉一次就意味着 0 元记录能被写进数据库。这里在 zod 校验通过后兜一层，
+ * 提示词负责"尽量对"，这里负责"一定对"。
+ */
+export function applyConstraintHints(
+  spec: AppSpec,
+  rawPrompt: string,
+): { spec: AppSpec; changed: string[] } {
+  if (!CONSTRAINT_RE.test(rawPrompt)) return { spec, changed: [] };
+
+  const next = JSON.parse(JSON.stringify(spec)) as AppSpec;
+  const changed: string[] = [];
+
+  for (const entity of next.entities) {
+    for (const field of entity.fields) {
+      if (field.type !== 'number' || field.min !== undefined) continue;
+      if (MONEY_LABEL_RE.test(field.label)) {
+        field.min = 0.01;
+        changed.push(`${field.label} ≥ 0.01`);
+      } else if (COUNT_LABEL_RE.test(field.label)) {
+        field.min = 1;
+        changed.push(`${field.label} ≥ 1`);
+      }
+    }
+  }
+
+  return { spec: next, changed };
+}
+
 function zodToIssues(error: unknown): Issue[] {
   const anyErr = error as { issues?: Array<{ path: (string | number)[]; message: string; code?: string }> };
   return (anyErr.issues ?? []).slice(0, 8).map((i) => ({
@@ -74,6 +111,12 @@ export async function generateSpec(input: {
       issues = zodToIssues(parsed.error);
     } else {
       spec = parsed.data;
+      // 提示词之外再兜一层：把「金额大于 0」这类约束确定性落到字段 min 上
+      const hinted = applyConstraintHints(spec, prompt);
+      if (hinted.changed.length > 0) {
+        spec = hinted.spec;
+        emit({ t: 'text', text: `按需求补充了字段下限约束：${hinted.changed.join('、')}` });
+      }
       issues = validateSpec(spec);
     }
 

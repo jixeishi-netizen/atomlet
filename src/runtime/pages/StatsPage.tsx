@@ -62,7 +62,7 @@ export function StatsPage({ entity, page, rows }: Props) {
           return (
             <div key={card.label} className="card px-4 py-3">
               <div className="text-[12px] text-ink-500">{card.label}</div>
-              <div className="mt-1.5 text-[22px] font-medium leading-none text-ink-900">
+              <div className="mt-1.5 text-[22px] font-medium leading-none text-[var(--brand-600)]">
                 {isMoney ? '¥' : ''}
                 {display}
               </div>

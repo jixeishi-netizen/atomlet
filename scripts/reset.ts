@@ -8,7 +8,7 @@ import { db } from '../src/lib/db';
 async function main() {
   console.log('清空业务表…');
   await db.execute(
-    sql`TRUNCATE TABLE app_records, share_links, app_versions, gen_runs, apps RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE TABLE messages, app_records, share_links, app_versions, gen_runs, apps RESTART IDENTITY CASCADE`,
   );
   console.log('已清空。接着执行 npm run db:seed 重新灌种子数据。');
   process.exit(0);

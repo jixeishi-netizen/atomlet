@@ -25,7 +25,7 @@ export function FieldInput({ field, value, error, disabled, onChange }: Props) {
             checked={value === true || value === 'true'}
             disabled={disabled}
             onChange={(e) => onChange(e.target.checked)}
-            className="h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500"
+            className="h-4 w-4 rounded border-ink-300 text-[var(--brand-600)] focus:ring-[var(--brand-500)]"
           />
           {field.label}
         </label>
@@ -80,8 +80,9 @@ export function FieldInput({ field, value, error, disabled, onChange }: Props) {
           }
           value={str}
           placeholder={field.placeholder}
-          min={field.min}
-          max={field.max}
+          // 只有 number 才带 min/max：让浏览器先挡一层，服务端仍然是最终裁判
+          min={field.type === 'number' ? field.min : undefined}
+          max={field.type === 'number' ? field.max : undefined}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
         />

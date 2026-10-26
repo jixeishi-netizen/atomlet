@@ -1,8 +1,16 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppRenderer } from '@/runtime/AppRenderer';
+import type { MessageView } from '@/runtime/EditPanel';
 import type { RowsByEntity } from '@/runtime/types';
-import { getApp, getCurrentSpec, getRecordsByEntity, getShareLink, listVersions } from '@/lib/data';
+import {
+  getApp,
+  getCurrentSpec,
+  getRecordsByEntity,
+  getShareLink,
+  listMessages,
+  listVersions,
+} from '@/lib/data';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,6 +49,25 @@ export default async function AppPage({ params }: { params: { id: string } }) {
     ops: Array.isArray(v.patch) ? v.patch.length : 0,
   }));
 
+  // 历史对话来自数据库，不依赖前端 state：刷新/换设备都还在（缺陷 1）
+  const messageRows = await listMessages(app.id);
+  const messages: MessageView[] = messageRows.map((m) => ({
+    id: m.id,
+    role: m.role === 'user' ? 'user' : 'assistant',
+    content: m.content,
+    version: m.version,
+    createdAt: m.createdAt.toISOString(),
+    meta: m.meta
+      ? {
+          kind: m.meta.kind,
+          ops: m.meta.ops,
+          dropped: m.meta.dropped,
+          model: m.meta.model,
+          degraded: m.meta.degraded,
+        }
+      : null,
+  }));
+
   return (
     <main className="mx-auto max-w-6xl px-5 py-6">
       <div className="mb-4 flex items-center gap-2 text-[12px] text-ink-300">
@@ -65,6 +92,7 @@ export default async function AppPage({ params }: { params: { id: string } }) {
         submitUrl={`/api/apps/${app.id}/records`}
         sharePath={link ? `/p/${link.token}` : undefined}
         versions={versions}
+        messages={messages}
       />
 
       <p className="mt-8 text-[11px] leading-relaxed text-ink-300">

@@ -3,7 +3,9 @@
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import type { AppSpec, Page } from '@/lib/spec/schema';
+import { themeName, themeStyle } from '@/lib/theme';
 import type { Row, RowsByEntity } from './types';
+import type { MessageView } from './EditPanel';
 import { FormPage } from './pages/FormPage';
 import { TablePage } from './pages/TablePage';
 import { StatsPage } from './pages/StatsPage';
@@ -25,6 +27,7 @@ type Props = {
   submitUrl: string;
   sharePath?: string;
   versions?: Array<{ version: number; note: string | null; ops: number }>;
+  messages?: MessageView[];
 };
 
 export function AppRenderer({
@@ -35,6 +38,7 @@ export function AppRenderer({
   submitUrl,
   sharePath,
   versions = [],
+  messages = [],
 }: Props) {
   const router = useRouter();
 
@@ -68,14 +72,23 @@ export function AppRenderer({
 
   const entity = spec.entities.find((e) => e.key === active.entity);
   const rows = rowsByEntity[active.entity] ?? [];
+  const theme = spec.app.theme;
 
   return (
-    <div>
+    // data-theme + 内联 CSS 变量：主题真正作用到 DOM（缺陷 2，可在 DevTools 里核对 --brand-600）
+    <div
+      data-theme={theme}
+      style={themeStyle(theme)}
+      className="rounded-xl bg-[var(--canvas)] p-4 sm:p-5"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-[18px] font-medium text-ink-900">{appInfo.name}</h1>
-            <span className="chip">v{appInfo.version}</span>
+            <span className="chip !border-ink-100 !bg-[var(--brand-50)] !text-[var(--brand-600)]">
+              v{appInfo.version}
+            </span>
+            <span className="text-[11px] text-ink-300">主题：{themeName[theme]}</span>
             {mode === 'public' ? (
               <span className="chip !border-ok-600/30 !bg-ok-50 !text-ok-600">外部填报</span>
             ) : null}
@@ -100,8 +113,8 @@ export function AppRenderer({
               }}
               className={`rounded-md px-3 py-1.5 text-[13px] transition-colors ${
                 p.id === active.id
-                  ? 'bg-brand-600 text-white'
-                  : 'border border-ink-100 bg-white text-ink-700 hover:border-ink-300'
+                  ? 'bg-[var(--brand-600)] text-white'
+                  : 'border border-ink-100 bg-white text-ink-700 hover:border-[var(--brand-500)]'
               }`}
             >
               {p.title}
@@ -155,6 +168,7 @@ export function AppRenderer({
           appId={appInfo.id}
           currentVersion={appInfo.version}
           versions={versions}
+          messages={messages}
         />
       ) : null}
     </div>
@@ -198,7 +212,7 @@ function ShareBox({ path }: { path: string }) {
             href={path}
             target="_blank"
             rel="noreferrer"
-            className="mt-2 inline-block text-[12px] text-brand-600 hover:underline"
+            className="mt-2 inline-block text-[12px] text-[var(--brand-600)] hover:underline"
           >
             在新窗口打开填报页 →
           </a>

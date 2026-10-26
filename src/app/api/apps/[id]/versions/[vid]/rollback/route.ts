@@ -1,4 +1,4 @@
-import { bumpVersion, getApp, getVersion } from '@/lib/data';
+import { appendMessage, bumpVersion, getApp, getVersion } from '@/lib/data';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +32,18 @@ export async function POST(_req: Request, { params }: { params: { id: string; vi
     spec: target.spec,
     patch: null,
     note: `回滚到 v${target.version}`,
+  });
+
+  await appendMessage({
+    appId: app.id,
+    role: 'assistant',
+    content: `已回滚到 v${target.version}，当前版本 v${versionNo}（旧版本仍保留）。`,
+    version: versionNo,
+    meta: {
+      kind: 'rollback',
+      note: `回滚到 v${target.version}`,
+      instructions: [`from v${app.currentVersion}`, `to v${target.version}`],
+    },
   });
 
   return Response.json({

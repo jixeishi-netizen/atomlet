@@ -27,7 +27,11 @@ AppSpec 结构（严格遵守，多余字段会被拒绝）：
 2. 所有 page.entity、columns.field、filters.field、cards.field、defaultSort.field 必须存在于对应实体的字段里，否则视为失败。
 3. sum/avg/max/min 只能作用在 number 类型字段上。
 4. 必须包含一个 form 页面。
-5. 不要输出 markdown 代码块，不要输出注释。`;
+5. 需求里出现「大于0 / 不能为0 / 必须为正 / 至少1 / 至少为1 / 不为0」这类下限约束时，必须给对应 number 字段设置 min，不能只写在 description 里：
+   - 金额类（字段 label 含 金额/费用/价格/成本/工资）→ "min": 0.01
+   - 数量类（字段 label 含 数量/件数/人数/次数）→ "min": 1
+   例：需求「记录报销，金额必须大于 0」→ {"key":"amount","label":"金额","type":"number","format":"money","required":true,"min":0.01}
+6. 不要输出 markdown 代码块，不要输出注释。`;
 
 export const PLANNER_BRIEF = `你是 Atomlet 的 Planner 角色。根据用户的业务描述，判断要记录什么对象、需要哪些字段、需要哪几个页面。
 只输出一行中文规划结论，格式：实体=xx；字段=xx,xx,xx；页面=表单,列表,统计,详情；关键指标=xx。

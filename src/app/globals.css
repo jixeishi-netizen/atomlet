@@ -4,6 +4,12 @@
 
 :root {
   --font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  /* 主题变量默认值（neutral）：应用页会由 AppRenderer 用 spec.app.theme 覆盖这些变量，
+     工作台等非应用页则沿用这里的默认值 */
+  --brand-600: #4f46e5;
+  --brand-500: #6366f1;
+  --brand-50: #eef2ff;
+  --canvas: #f5f3ec;
 }
 
 html,
@@ -25,13 +31,23 @@ body {
     @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-brand-600 text-white hover:bg-brand-500;
+    @apply btn text-white;
+    background-color: var(--brand-600, #4f46e5);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-color: var(--brand-500, #6366f1);
+  }
+  .btn-primary:disabled {
+    background-color: var(--brand-600, #4f46e5);
   }
   .btn-ghost {
     @apply btn border border-ink-100 bg-white text-ink-700 hover:border-ink-300;
   }
   .input {
-    @apply w-full rounded-md border border-ink-100 bg-white px-3 py-2 text-[13px] text-ink-900 outline-none transition-colors placeholder:text-ink-300 focus:border-brand-500;
+    @apply w-full rounded-md border border-ink-100 bg-white px-3 py-2 text-[13px] text-ink-900 outline-none transition-colors placeholder:text-ink-300;
+  }
+  .input:focus {
+    border-color: var(--brand-500, #6366f1);
   }
   .label {
     @apply mb-1.5 block text-[12px] font-medium text-ink-700;
