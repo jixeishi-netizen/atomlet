@@ -7,6 +7,28 @@ type Template = {
 
 const commonDetail = { id: 'p_detail', type: 'detail' as const, title: '记录详情', entity: 'record' };
 
+/** 交互式应用：没有实体，靠内置引擎渲染。防止把「做游戏」生成成「游戏记录本」 */
+const game2048: AppSpec = {
+  specVersion: '1.0',
+  app: {
+    name: '2048',
+    theme: 'warm',
+    icon: 'table',
+    description: '经典 2048 数字合并游戏',
+  },
+  entities: [],
+  pages: [
+    {
+      id: 'p_game',
+      type: 'game',
+      title: '2048',
+      game: '2048',
+      intro: '方向键或滑动移动方块，相同数字合并',
+    },
+  ],
+  sharePolicy: { mode: 'write', entities: [] },
+};
+
 const repair: AppSpec = {
   specVersion: '1.0',
   app: {
@@ -364,6 +386,7 @@ const generic: AppSpec = {
 };
 
 const TEMPLATES: Template[] = [
+  { keys: /2048/, build: () => structuredClone(game2048) },
   { keys: /报修|维修|工单|设备故障|修理|故障/, build: () => structuredClone(repair) },
   { keys: /巡检|检查|门店|整改|安全/, build: () => structuredClone(inspection) },
   { keys: /报销|费用|发票|差旅|报销单/, build: () => structuredClone(expense) },

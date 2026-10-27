@@ -75,6 +75,15 @@ function extractNewFieldLabel(instruction: string): string | null {
 /** mock 通道：规则匹配意图，输出确定性 patch（无需 API key，但同样要过白名单与校验） */
 export function mockPatch(req: PatchRequest): PatchOutput {
   const { spec, instruction } = req;
+  // 交互式应用没有实体，规则通道无法改游戏逻辑，如实降级而不是报错
+  if (spec.entities.length === 0) {
+    return {
+      patch: [],
+      degraded: true,
+      note: '这是交互式应用（内置游戏引擎），暂不支持用一句话修改玩法；可以改标题或主题',
+      model: 'mock:rule',
+    };
+  }
   const { entity, index: entityIndex } = pickEntity(spec);
   const ops: PatchOp[] = [];
   const addIntent = /(加|新增|添加|增加)/.test(instruction);

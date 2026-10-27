@@ -11,6 +11,7 @@ import { TablePage } from './pages/TablePage';
 import { StatsPage } from './pages/StatsPage';
 import { DetailPage } from './pages/DetailPage';
 import { UnsupportedPage } from './pages/UnsupportedPage';
+import { GamePage } from './pages/GamePage';
 import { EditPanel } from './EditPanel';
 
 type Props = {
@@ -44,10 +45,10 @@ export function AppRenderer({
 
   const pages = useMemo<Page[]>(() => {
     if (mode === 'public') {
-      return spec.pages.filter(
-        (p): p is Extract<Page, { type: 'form' }> =>
-          p.type === 'form' && spec.sharePolicy.entities.includes(p.entity),
-      );
+      return spec.pages.filter((p) => {
+        if (p.type === 'game') return true; // 交互页无需数据，可直接分享
+        return p.type === 'form' && spec.sharePolicy.entities.includes(p.entity);
+      });
     }
     return spec.pages;
   }, [mode, spec]);
@@ -70,8 +71,9 @@ export function AppRenderer({
     );
   }
 
-  const entity = spec.entities.find((e) => e.key === active.entity);
-  const rows = rowsByEntity[active.entity] ?? [];
+  const entity =
+    active.type === 'game' ? undefined : spec.entities.find((e) => e.key === active.entity);
+  const rows = entity ? (rowsByEntity[entity.key] ?? []) : [];
   const theme = spec.app.theme;
 
   return (
@@ -124,7 +126,9 @@ export function AppRenderer({
       ) : null}
 
       <div className="mt-5">
-        {!entity ? (
+        {active.type === 'game' ? (
+          <GamePage page={active} appId={appInfo.id} />
+        ) : !entity ? (
           <div className="card p-6 text-[13px] text-bad-600">
             页面引用的实体「{active.entity}」不存在，这是 AppSpec 校验未拦住的情况。
           </div>

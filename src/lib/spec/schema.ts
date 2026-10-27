@@ -104,6 +104,28 @@ export const boardPageSchema = z.object({
   metric: z.object({ label: z.string(), fn: z.enum(['count', 'sum', 'avg']), field: z.string().optional() }),
 });
 
+/**
+ * 交互式页面：由内置引擎渲染，不是数据 CRUD。
+ * 存在的意义：用户说"做一个 2048"时，输出必须是能玩的游戏，而不是"对局记录本"。
+ */
+/**
+ * 交互式页面的两种实现：
+ * - 2048：内置引擎，确定性渲染，质量稳定
+ * - custom：模型生成的单文件 HTML，在沙箱 iframe 里跑，用来覆盖内置引擎没做的事（贪吃蛇/俄罗斯方块/计算器等）
+ */
+export const GAME_ENGINES = ['2048', 'custom'] as const;
+
+export const gamePageSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1).max(24),
+  type: z.literal('game'),
+  game: z.enum(GAME_ENGINES),
+  entity: z.string().optional(),
+  intro: z.string().max(80).optional(),
+  /** game === 'custom' 时必填：自包含的单文件 HTML（内联 CSS/JS，不引用外部资源） */
+  html: z.string().max(120000).optional(),
+});
+
 export const chartPageSchema = z.object({
   ...pageCommon,
   type: z.literal('chart'),
@@ -119,6 +141,7 @@ export const pageSchema = z.discriminatedUnion('type', [
   statsPageSchema,
   boardPageSchema,
   chartPageSchema,
+  gamePageSchema,
 ]);
 
 export const specSchema = z.object({
@@ -129,11 +152,11 @@ export const specSchema = z.object({
     description: z.string().max(60).optional(),
     icon: z.string().max(24).optional(),
   }),
-  entities: z.array(entitySchema).min(1).max(4),
+  entities: z.array(entitySchema).max(4),
   pages: z.array(pageSchema).min(1).max(6),
   sharePolicy: z.object({
     mode: z.enum(['read', 'write']),
-    entities: z.array(z.string()).min(1),
+    entities: z.array(z.string()),
   }),
 });
 

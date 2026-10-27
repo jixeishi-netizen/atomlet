@@ -18,8 +18,14 @@ export function validateSpec(spec: AppSpec): Issue[] {
   const fieldKeys = (entityKey: string) =>
     new Set((entities.get(entityKey)?.fields ?? []).map((f) => f.key));
 
-  if (spec.entities.length === 0) {
-    issues.push({ code: 'NO_ENTITY', path: 'entities', message: '至少需要一个实体' });
+  const hasGamePage = spec.pages.some((p) => p.type === 'game');
+
+  if (spec.entities.length === 0 && !hasGamePage) {
+    issues.push({
+      code: 'NO_ENTITY',
+      path: 'entities',
+      message: '至少需要一个实体（纯交互式应用请提供一个 game 页面）',
+    });
   }
 
   // 实体字段唯一性 + enum / ref 合法性
@@ -64,6 +70,36 @@ export function validateSpec(spec: AppSpec): Issue[] {
       issues.push({ code: 'DUP_PAGE', path: at, message: `页面 id ${page.id} 重复` });
     }
     pageIds.add(page.id);
+
+    // 交互式页面由内置引擎或沙箱 iframe 渲染，没有实体概念
+    if (page.type === 'game') {
+      if (!page.game) {
+        issues.push({ code: 'GAME_ENGINE_MISSING', path: at, message: '交互页缺少 game 引擎标识' });
+      }
+      if (page.game === 'custom') {
+        const html = page.html ?? '';
+        if (html.length < 200) {
+          issues.push({
+            code: 'CUSTOM_HTML_MISSING',
+            path: at,
+            message: 'game=custom 必须提供完整的单文件 HTML（至少 200 字符）',
+          });
+        } else if (/(?:src|href)\s*=\s*["']https?:\/\//i.test(html)) {
+          issues.push({
+            code: 'EXTERNAL_RESOURCE',
+            path: at,
+            message: '自定义页面不允许引用外部 http(s) 资源，必须自包含',
+          });
+        } else if (!/<script[\s>]/i.test(html) && !/<canvas[\s>]/i.test(html)) {
+          issues.push({
+            code: 'NO_INTERACTION',
+            path: at,
+            message: '自定义页面既没有 script 也没有 canvas，无法交互',
+          });
+        }
+      }
+      continue;
+    }
 
     if (!entities.has(page.entity)) {
       issues.push({ code: 'PAGE_ENTITY_MISSING', path: at, message: `页面引用的实体 ${page.entity} 不存在` });
@@ -112,8 +148,8 @@ export function validateSpec(spec: AppSpec): Issue[] {
     }
   }
 
-  // 主流程可演示性：必须有一个可提交的表单，否则"生成即能用"不成立
-  if (!spec.pages.some((p: Page) => p.type === 'form')) {
+  // 主流程可演示性：有实体就必须有表单页；纯交互式应用（game）不需要
+  if (spec.entities.length > 0 && !spec.pages.some((p: Page) => p.type === 'form')) {
     issues.push({ code: 'NO_FORM_PAGE', path: 'pages', message: '缺少表单页，用户无法录入数据' });
   }
 
